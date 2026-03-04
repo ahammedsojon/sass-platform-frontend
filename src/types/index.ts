@@ -37,3 +37,15 @@ export interface IDashboardStats {
   in_progress_tasks: number;
   completed_tasks: number;
 }
+
+export interface IActivity {
+  id: number
+  action: string
+  model_type: string
+  description: string
+  created_at: string
+  user: {
+    id: number
+    name: string
+  }
+}

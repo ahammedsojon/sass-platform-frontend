@@ -6,6 +6,7 @@ import ProjectsPage from '@/views/ProjectsPage.vue'
 import TasksPage from '@/views/TasksPage.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import DashboardPage from '@/views/DashboardPage.vue'
+import ActivitiesPage from '@/views/ActivitiesPage.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -24,7 +25,8 @@ const routes: Array<RouteRecordRaw> = [
       { path: '', component: DashboardPage },
       { path: 'dashboard', component: DashboardPage, meta: {title: 'Dashboard'} },
       { path: 'projects', component: ProjectsPage, meta: {title: 'Projects'} },
-      { path: 'tasks', component: TasksPage, meta: {title: 'Tasks'} }
+      { path: 'tasks', component: TasksPage, meta: {title: 'Tasks'} },
+      { path: 'activities', component: ActivitiesPage, meta: {title: 'Activity Logs'} }
     ]
   }
 ]

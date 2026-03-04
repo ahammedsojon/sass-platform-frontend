@@ -28,6 +28,14 @@
       >
         Tasks
       </RouterLink>
+
+      <RouterLink
+        to="/admin/activities"
+        class="block px-4 py-2 rounded-lg hover:bg-gray-800 transition"
+        active-class="bg-gray-800 text-white"
+      >
+        Activity Logs
+      </RouterLink>
     </nav>
   </aside>
 </template>

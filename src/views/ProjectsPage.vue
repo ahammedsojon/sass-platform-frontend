@@ -15,42 +15,61 @@
 
     <!-- Table -->
     <div class="bg-white rounded-2xl shadow overflow-hidden">
+      <div class="flex justify-between items-center p-4 bg-gray-50">
+        <input
+          v-model="search"
+          @input="fetchProjects()"
+          placeholder="Search tasks..."
+          class="border rounded-lg px-4 py-2 w-64"
+        />
+      </div>
+
       <table class="w-full text-left">
         <thead class="bg-gray-50 text-gray-600 text-sm">
-        <tr>
-          <th class="p-4">Name</th>
-          <th class="p-4">Description</th>
-          <th v-if="canManage" class="p-4 text-right">Actions</th>
-        </tr>
+          <tr>
+            <th class="p-4">Name</th>
+            <th class="p-4">Description</th>
+            <th v-if="canManage" class="p-4 text-right">Actions</th>
+          </tr>
         </thead>
 
         <tbody>
-        <tr
-          v-for="project in projects"
-          :key="project.id"
-          class="border-t hover:bg-gray-50"
-        >
-          <td class="p-4">{{ project.name }}</td>
-          <td class="p-4">{{ project.description }}</td>
+          <tr v-for="project in projects" :key="project.id" class="border-t hover:bg-gray-50">
+            <td class="p-4">{{ project.name }}</td>
+            <td class="p-4">{{ project.description }}</td>
 
-          <td v-if="canManage" class="p-4 text-right space-x-2">
-            <button
-              @click="openEdit(project)"
-              class="text-blue-600 hover:underline"
-            >
-              Edit
-            </button>
+            <td v-if="canManage" class="p-4 text-right space-x-2">
+              <button @click="openEdit(project)" class="text-blue-600 hover:underline">Edit</button>
 
-            <button
-              @click="deleteProject(project.id)"
-              class="text-red-600 hover:underline"
-            >
-              Delete
-            </button>
-          </td>
-        </tr>
+              <button @click="deleteProject(project.id)" class="text-red-600 hover:underline">
+                Delete
+              </button>
+            </td>
+          </tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="flex justify-center items-center gap-2 mt-6">
+      <button
+        :disabled="pagination.current_page === 1"
+        @click="fetchProjects(pagination.current_page - 1)"
+        class="px-4 py-2 border rounded-lg"
+      >
+        Previous
+      </button>
+
+      <span class="text-sm text-gray-600">
+        Page {{ pagination.current_page }} of {{ pagination.last_page }}
+      </span>
+
+      <button
+        :disabled="pagination.current_page === pagination.last_page"
+        @click="fetchProjects(pagination.current_page + 1)"
+        class="px-4 py-2 border rounded-lg"
+      >
+        Next
+      </button>
     </div>
 
     <!-- Modal -->
@@ -75,18 +94,11 @@
         />
 
         <div class="flex justify-end gap-3">
-          <button
-            type="button"
-            @click="showModal = false"
-            class="px-4 py-2 border rounded-lg"
-          >
+          <button type="button" @click="showModal = false" class="px-4 py-2 border rounded-lg">
             Cancel
           </button>
 
-          <button
-            type="submit"
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg"
-          >
+          <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">
             {{ isEditing ? 'Update' : 'Create' }}
           </button>
         </div>
@@ -103,8 +115,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useToast } from "vue-toastification";
-const toast = useToast();
+import { useToast } from 'vue-toastification'
+
+const toast = useToast()
 import api from '../api/axios'
 import type { IProject } from '@/types'
 import BaseModal from '../components/BaseModal.vue'
@@ -117,25 +130,37 @@ const projects = ref<IProject[]>([])
 const showModal = ref(false)
 const isEditing = ref(false)
 const editingId = ref<number | null>(null)
-
+const search = ref('')
 
 const showDeleteModal = ref(false)
 const deletingId = ref<number | null>(null)
 
+const pagination = reactive({
+  current_page: 1,
+  last_page: 1,
+  total: 0,
+})
+
 const form = reactive({
   name: '',
-  description: ''
+  description: '',
 })
 
 const canManage = computed(() => {
-  return auth.user?.roles.some(role =>
-    ['Admin', 'Manager'].includes(role.name)
-  )
+  return auth.user?.roles.some((role) => ['Admin', 'Manager'].includes(role.name))
 })
 
-const fetchProjects = async () => {
-  const res = await api.get('/projects')
-  projects.value = res.data
+const fetchProjects = async (page = 1) => {
+  const res = await api.get('/projects', {
+    params: {
+      page,
+      search: search.value,
+    },
+  })
+  projects.value = res.data.data
+  pagination.current_page = res.data.current_page
+  pagination.last_page = res.data.last_page
+  pagination.total = res.data.total
 }
 
 const openCreate = () => {
@@ -155,11 +180,11 @@ const openEdit = (project: IProject) => {
 
 const submitProject = async () => {
   if (isEditing.value && editingId.value) {
-    await api.put(`/projects/${editingId.value}`, form);
-    toast.success("Project updated successfully");
+    await api.put(`/projects/${editingId.value}`, form)
+    toast.success('Project updated successfully')
   } else {
-    await api.post('/projects', form);
-    toast.success("Project created successfully");
+    await api.post('/projects', form)
+    toast.success('Project created successfully')
   }
 
   showModal.value = false
@@ -171,18 +196,17 @@ const deleteProject = (id: number) => {
 }
 
 const performDelete = async () => {
-  if (deletingId.value === null) return;
+  if (deletingId.value === null) return
   try {
     await api.delete(`/projects/${deletingId.value}`)
-    toast.success("Project deleted successfully")
+    toast.success('Project deleted successfully')
     fetchProjects()
   } catch (error: any) {
-    toast.error("Failed to delete project")
+    toast.error('Failed to delete project')
   } finally {
     deletingId.value = null
   }
 }
-
 
 onMounted(fetchProjects)
 </script>
