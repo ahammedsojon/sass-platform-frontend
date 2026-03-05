@@ -28,6 +28,7 @@ export interface ITask {
   assigned_to: number;
   project?: IProject;
   assignee?: IUser;
+  attachments?: [];
 }
 
 export interface IDashboardStats {

@@ -147,6 +147,66 @@
           <option value="in_progress">In Progress</option>
           <option value="completed">Completed</option>
         </select>
+        <div
+          class="border-2 border-dashed border-gray-300 rounded-lg h-[100px]"
+          @dragover.prevent
+          @drop.prevent="handleDrop"
+        >
+          <label class=" flex items-center justify-center w-full h-full">Drag & Drop files here
+            or click to upload
+
+            <input
+              type="file"
+              multiple
+              @change="handleFile"
+              class="hidden"
+              ref="fileInput"
+            />
+          </label>
+        </div>
+        <div v-if="selectedFiles.length" class="mt-3 space-y-2">
+          <div
+            v-for="(file, index) in selectedFiles"
+            :key="index"
+            class="flex justify-between items-center bg-gray-50 p-2 rounded-lg text-sm"
+          >
+            <span>{{ file.name }}</span>
+
+            <button
+              type="button"
+              @click="removeFile(index)"
+              class="text-red-500 text-xs"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+
+        <div v-if="isEditing && taskAttachments?.length" class="mt-4">
+          <h4 class="text-sm font-semibold mb-2">Uploaded Files</h4>
+
+          <div
+            v-for="file in taskAttachments"
+            :key="file.id"
+            class="flex justify-between items-center bg-gray-50 p-3 rounded-lg mb-2"
+          >
+            <a
+              :href="`http://saas-platform.test/storage/${file.file_path}`"
+              target="_blank"
+              class="text-indigo-600 text-sm hover:underline"
+            >
+              {{ file.file_name }}
+            </a>
+
+            <button
+              @click="deleteAttachment(file.id)"
+              class="text-red-500 text-xs"
+              type="button"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
 
         <div class="flex justify-end gap-3">
           <button type="button" @click="showModal = false" class="px-4 py-2 border rounded-lg">
@@ -196,6 +256,9 @@ const deletingId = ref<number | null>(null)
 
 const filterProject = ref<string | number>('')
 const filterStatus = ref<string>('')
+const selectedFiles = ref<File[]>([])
+const taskAttachments = ref<any[]>([])
+const previews = ref([])
 
 const pagination = reactive({
   current_page: 1,
@@ -214,6 +277,34 @@ const form = reactive({
 const canManage = computed(() => {
   return auth.user?.roles.some((role) => ['Admin', 'Manager'].includes(role.name))
 })
+
+const handleFile = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input.files) return
+
+  const newFile = input.files[0];
+
+  // Append instead of replace
+  if(newFile){
+    selectedFiles.value.push(newFile);
+  }
+
+  // Clear input so same file can be re-selected
+  input.value = ''
+}
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault()
+
+  if (!event.dataTransfer) return
+  const files = Array.from(event.dataTransfer.files)
+
+  files.forEach(file => {
+    selectedFiles.value.push(file)
+  })
+}
+const removeFile = (index: number) => {
+  selectedFiles.value.splice(index, 1)
+}
 
 const fetchTasks = async (page = 1) => {
   const res = await api.get('/tasks', {
@@ -238,7 +329,7 @@ const fetchUsers = async () => {
 
 const fetchProjects = async () => {
   const res = await api.get('/projects')
-  projects.value = res.data
+  projects.value = res.data.data
 }
 
 const openCreate = () => {
@@ -259,19 +350,40 @@ const openEdit = (task: ITask) => {
   form.project_id = task.project_id
   form.assigned_to = task.assigned_to
   form.status = task.status
+  taskAttachments.value = task.attachments || []
   showModal.value = true
 }
 
 const submitTask = async () => {
+  let taskId: number | null = null
+
   if (isEditing.value && editingId.value) {
     await api.put(`/tasks/${editingId.value}`, form)
+    taskId = editingId.value
     toast.success('Task updated successfully')
   } else {
-    await api.post('/tasks', form)
+    const response = await api.post('/tasks', form)
+    taskId = response.data.data.id   // make sure API returns id
     toast.success('Task created successfully')
   }
 
+  // Only upload if files exist
+  if (selectedFiles.value.length && taskId) {
+    const formData = new FormData()
+    selectedFiles.value.forEach(file => formData.append('files[]', file))
+
+    api.post(`/tasks/${taskId}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(() => {
+      toast.success('Files uploaded successfully')
+      fetchTasks() // Refresh to show new attachments
+    }).catch(() => {
+      toast.error('Failed to upload files')
+    })
+  }
+
   showModal.value = false
+  selectedFiles.value = [];
   await fetchTasks()
 }
 
@@ -290,6 +402,27 @@ const performDelete = async () => {
     toast.error('Failed to delete task')
   } finally {
     deletingId.value = null
+  }
+}
+
+
+const deleteAttachment = async (id: number) => {
+  try {
+    await api.delete(`/attachments/${id}`)
+
+    // Remove from global attachments
+    taskAttachments.value = taskAttachments.value.filter(
+      attachment => attachment.id !== id
+    )
+
+    // Remove from specific task
+    if (editingId.value !== null) {
+      console.log(tasks.value)
+    }
+    fetchTasks();
+    toast.success('Attachment deleted successfully')
+  } catch (error: any) {
+    toast.error('Failed to delete attachment', error)
   }
 }
 
